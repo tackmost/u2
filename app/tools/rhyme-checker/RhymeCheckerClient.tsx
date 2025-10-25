@@ -1,32 +1,12 @@
-// クライアントコンポーネントの宣言
 'use client';
 
 import { useState } from 'react';
-// 分離したAPIロジックと型定義をインポート
-import { getRhymeScore, RhymeResult } from '@/lib/rhymeService';
-// (注: Next.jsでは @/ が src/ または ルート を指すエイリアスとして設定されていることが多いです)
-// (もしエイリアスがなければ '../lib/rhymeService' のように相対パスで指定します)
-
-// ------------------------------------------------------------------
-// メインのUIコンポーネント
-// ------------------------------------------------------------------
-
-// export default function RhymeCheckerPage() { // ← 元の関数名
-export default function RhymeCheckerClient() { // ← 関数名を変更
-  
-  // ------------------------------------------------------------------
-  // State（状態）の定義
-  // ------------------------------------------------------------------
-  
+import { getRhymeScore, RhymeResult } from '../../lib/rhymeService';
+export default function RhymeCheckerClient() {
   const [textInput, setTextInput] = useState<string>('');
   const [result, setResult] = useState<RhymeResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  // ------------------------------------------------------------------
-  // イベントハンドラ
-  // ------------------------------------------------------------------
-
   const handleSubmit = async () => {
     setIsLoading(true);
     setError(null);
@@ -39,7 +19,6 @@ export default function RhymeCheckerClient() { // ← 関数名を変更
     }
 
     try {
-      // 分離したAPI呼び出し関数を使う
       const scoreResult = await getRhymeScore(textInput);
       setResult(scoreResult);
 
@@ -55,12 +34,7 @@ export default function RhymeCheckerClient() { // ← 関数名を変更
     }
   };
 
-  // ------------------------------------------------------------------
-  // レンダリング (JSX)
-  // ------------------------------------------------------------------
   return (
-    // <main> タグは app/tools/rhyme-checker/page.tsx が担当するので、
-    // ここでは <div> から始めます。
     <div className="bg-white w-full max-w-2xl p-6 sm:p-8 rounded-2xl shadow-lg">
       
       <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
@@ -70,7 +44,6 @@ export default function RhymeCheckerClient() { // ← 関数名を変更
         歌詞や詩、文章を入力してください。AIが韻の踏み具合を採点します。
       </p>
 
-      {/* 入力フォーム */}
       <div className="space-y-4">
         <label htmlFor="text-input" className="block text-sm font-medium text-gray-700 sr-only">
           採点するテキスト
@@ -101,7 +74,7 @@ export default function RhymeCheckerClient() { // ← 関数名を変更
         </button>
       </div>
 
-      {/* エラーメッセージ表示エリア */}
+      {/* エラー表示エリア */}
       {error && (
         <div className="mt-4 p-4 bg-red-100 text-red-700 border border-red-300 rounded-lg">
           {error}

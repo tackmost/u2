@@ -1,47 +1,24 @@
-// Next.jsのApp Routerでクライアント側のインタラクティブ機能を使うため、
-// ファイルの先頭に 'use client' を宣言します。
 'use client';
 
-// ReactからuseStateフックをインポートします。
 import { useState } from 'react';
 
-// ------------------------------------------------------------------
-// 型定義 (TypeScript)
-// ------------------------------------------------------------------
-
-/** AIからの採点結果の型 */
 interface RhymeResult {
   score: number;  // 0-100点の点数
   reason: string; // 採点理由
 }
 
-// ------------------------------------------------------------------
-// メインのページコンポーネント
-// ------------------------------------------------------------------
 export default function RhymeCheckerPage() {
-  
-  // ------------------------------------------------------------------
-  // State（状態）の定義
-  // ------------------------------------------------------------------
   
   /** ユーザーが入力したテキスト */
   const [textInput, setTextInput] = useState<string>('');
   
   /** APIからの採点結果 */
   const [result, setResult] = useState<RhymeResult | null>(null);
-  
-  /** API通信中かどうかのフラグ */
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
-  /** 発生したエラーメッセージ */
   const [error, setError] = useState<string | null>(null);
 
-  // ------------------------------------------------------------------
-  // Gemini API 設定
-  // ------------------------------------------------------------------
-
-  // Canvas環境ではAPIキーは自動的に挿入されます。
-  const apiKey = ""; 
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
   /** LLMに期待するJSONの型定義 */
@@ -69,10 +46,6 @@ export default function RhymeCheckerPage() {
 - 81-100点: 高度な技術（例：長い母音の一致、複数の単語をまたぐ韻、文中の随所）が使われており、非常に完成度が高い。
 
 なぜその点数になったのか、どの部分がどのように韻を踏んでいる（または踏めていない）のかを具体的に、簡潔に説明してください。`;
-
-  // ------------------------------------------------------------------
-  // API呼び出し関数 (Exponential Backoff付き)
-  // ------------------------------------------------------------------
   
   /**
    * Exponential Backoff（指数関数的バックオフ）でAPIリトライを行うfetchラッパー

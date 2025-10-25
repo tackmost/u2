@@ -1,18 +1,9 @@
-// API通信と型定義をコンポーネントから分離
-
-// ------------------------------------------------------------------
-// 型定義 (TypeScript)
-// ------------------------------------------------------------------
 export interface RhymeResult {
   score: number;  // 0-100点の点数
   reason: string; // 採点理由
 }
 
-// ------------------------------------------------------------------
-// Gemini API 設定
-// ------------------------------------------------------------------
-
-const apiKey = ""; // Canvas環境ではAPIキーは自動的に挿入されます
+const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
 const responseSchema = {
@@ -39,10 +30,6 @@ const systemPrompt = `あなたは韻（ライム）の専門家です。入力�
 
 なぜその点数になったのか、どの部分がどのように韻を踏んでいる（または踏めていない）のかを具体的に、簡潔に説明してください。`;
 
-
-// ------------------------------------------------------------------
-// API呼び出し関数 (Exponential Backoff付き)
-// ------------------------------------------------------------------
 async function fetchWithBackoff(url: string, options: RequestInit, maxRetries: number = 5): Promise<Response> {
   let delay = 1000; 
   for (let i = 0; i < maxRetries; i++) {
@@ -67,9 +54,6 @@ async function fetchWithBackoff(url: string, options: RequestInit, maxRetries: n
   throw new Error('Max retries reached, but no response or error was returned.');
 }
 
-// ------------------------------------------------------------------
-// メインのAPI呼び出し関数 (コンポーネントから呼び出される)
-// ------------------------------------------------------------------
 export async function getRhymeScore(text: string): Promise<RhymeResult> {
   
   const payload = {
@@ -116,7 +100,6 @@ export async function getRhymeScore(text: string): Promise<RhymeResult> {
 
   } catch (error) {
     console.error('Error in getRhymeScore:', error);
-    // エラーを再度スローして、呼び出し元のコンポーネントでキャッチできるようにする
     throw error;
   }
 }
