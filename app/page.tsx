@@ -1,363 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { calculateTotalScore, fishKeywords } from '@/app/checkerLogic';
+import type { TotalScore, FishTheme } from '@/app/checkerLogic';
 
-// ==================================================================
-// 採点ロジック (checkerLogic)
-// ==================================================================
-
-/**
- * 魚のキーワードデータを定義するインターフェース
- */
-interface FishKeywordData {
-    [fishName: string]: string[];
-}
-type FishTheme = keyof FishKeywordData;
-
-/**
- * キーワードのマスターデータ
- */
-const fishKeywords: FishKeywordData = {
-    "maguro": [
-        "赤身", "トロ", "オーシャン", "スピード", "ツナ缶",
-        "寿司", "回遊魚", "一本釣り", "黒いダイヤ", "海の幸",
-        "DHA", "エリート", "シーチキン", "大間", "初競り"
-    ],
-    "tai": [
-        "めでたい", "王様", "白身", "鯛めし", "お祝い",
-        "桜鯛", "エビで釣る", "塩焼き", "瀬戸内", "上品",
-        "七福神", "横綱", "赤い", "お頭付き", "祝い酒"
-    ],
-    "iwashi": [
-        "群れ", "DHA", "オイルサーディン", "大群", "弱肉強食",
-        "イワシ雲", "目刺し", "雑魚じゃない", "青魚", "缶詰",
-        "サーディン", "大漁", "網", "プランクトン", "鰯"
-    ],
-    "same": [
-        "ジョーズ", "軟骨", "ハンター", "歯", "フカヒレ",
-        "鮫肌", "トップ", "海中", "恐ろしい", "頂点",
-        "シャーク", "捕食者", "古代魚", "獰猛", "海底"
-    ]
-};
-
-// --- ヘルパー関数 ---
-
-/**
- * カタカナの読み仮名から母音の文字列を抽出する
- */
-function getVowels(reading: string): string {
-    let vowels = '';
-    let lastVowel = '';
-
-    const vowelMap: { [key: string]: string } = {
-        'ア': 'A', 'イ': 'I', 'ウ': 'U', 'エ': 'E', 'オ': 'O',
-        'カ': 'A', 'キ': 'I', 'ク': 'U', 'ケ': 'E', 'コ': 'O',
-        'ガ': 'A', 'ギ': 'I', 'グ': 'U', 'ゲ': 'E', 'ゴ': 'O',
-        'サ': 'A', 'シ': 'I', 'ス': 'U', 'セ': 'E', 'ソ': 'O',
-        'ザ': 'A', 'ジ': 'I', 'ズ': 'U', 'ゼ': 'E', 'ゾ': 'O',
-        'タ': 'A', 'チ': 'I', 'ツ': 'U', 'テ': 'E', 'ト': 'O',
-        'ダ': 'A', 'ヂ': 'I', 'ヅ': 'U', 'デ': 'E', 'ド': 'O',
-        'ナ': 'A', 'ニ': 'I', 'ヌ': 'U', 'ネ': 'E', 'ノ': 'O',
-        'ハ': 'A', 'ヒ': 'I', 'フ': 'U', 'ヘ': 'E', 'ホ': 'O',
-        'バ': 'A', 'ビ': 'I', 'ブ': 'U', 'ベ': 'E', 'ボ': 'O',
-        'パ': 'A', 'ピ': 'I', 'プ': 'U', 'ペ': 'E', 'ポ': 'O',
-        'マ': 'A', 'ミ': 'I', 'ム': 'U', 'メ': 'E', 'モ': 'O',
-        'ヤ': 'A', 'ユ': 'U', 'ヨ': 'O',
-        'ラ': 'A', 'リ': 'I', 'ル': 'U', 'レ': 'E', 'ロ': 'O',
-        'ワ': 'A', 'ヰ': 'I', 'ヱ': 'E', 'ヲ': 'O',
-        'ン': 'N',
-    };
-    const youonMap: { [key: string]: string } = {
-        'ャ': 'A', 'ュ': 'U', 'ョ': 'O',
-    };
-
-    // 処理前に全角カタカナに統一し、不要な文字を除去
-    const cleanReading = reading
-        .replace(/[ぁ-ん]/g, (s) => String.fromCharCode(s.charCodeAt(0) + 0x60)) // ひらがな -> カタカナ
-        .replace(/[A-Za-z0-9]/g, '') // 英数字を除去
-        .replace(/[、。！？「」]/g, ''); // 句読点を除去
-
-    for (const char of cleanReading) {
-        if (vowelMap[char]) {
-            lastVowel = vowelMap[char];
-            vowels += lastVowel;
-        } else if (youonMap[char]) {
-            if (vowels.length > 0) {
-                lastVowel = youonMap[char];
-                vowels = vowels.slice(0, -1) + lastVowel;
-            }
-        } else if (char === 'ー') {
-            if (lastVowel) {
-                vowels += lastVowel;
-            }
-        }
-        // ッ（促音）は無視
-    }
-    return vowels;
-}
-
-/**
- * 2つの文字列間のレーベンシュタイン距離（編集距離）を計算する
- */
-function levenshteinDistance(a: string, b: string): number {
-    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
-
-    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-
-    for (let j = 1; j <= b.length; j++) {
-        for (let i = 1; i <= a.length; i++) {
-            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-            matrix[j][i] = Math.min(
-                matrix[j][i - 1] + 1,      // 削除
-                matrix[j - 1][i] + 1,      // 挿入
-                matrix[j - 1][i - 1] + cost // 置換
-            );
-        }
-    }
-    return matrix[b.length][a.length];
-}
-
-/**
- * 編集距離を 0% 〜 100% の類似度スコアに変換する
- */
-function calculateSimilarity(distance: number, len1: number, len2: number): number {
-    const maxLength = Math.max(len1, len2);
-    if (maxLength === 0) return 100;
-    const similarity = (1 - distance / maxLength) * 100;
-    return Math.max(0, Math.round(similarity));
-}
-
-
-// --- 採点ロジック ---
-
-/**
- * 採点結果の型
- */
-interface ScoreResult {
-    score: number; // 0-100点
-    detail: string; // 採点の詳細・理由
-}
-
-/**
- * 総合採点結果の型
- */
-interface TotalScore {
-    totalScore: number;
-    finalMessage: string;
-    keyword: ScoreResult;
-    rhyme: ScoreResult;
-    rhythm: ScoreResult;
-    meaning: ScoreResult;
-}
-
-// --- 1. キーワードチェッカー ---
-function checkKeywords(text: string, themeKeywords: string[]): ScoreResult {
-    if (!text || themeKeywords.length === 0) {
-        return { score: 0, detail: "テキストまたはキーワードがありません。" };
-    }
-
-    let hitCount = 0;
-    const hitWords: string[] = [];
-
-    themeKeywords.forEach(keyword => {
-        if (text.toLowerCase().includes(keyword.toLowerCase())) {
-            hitCount++;
-            hitWords.push(keyword);
-        }
-    });
-
-    const score = Math.min(100, (hitCount / 5) * 100);
-    
-    let detail = "";
-    if (hitCount === 0) {
-        detail = "お題のキーワードが1つも含まれていません。";
-    } else {
-        detail = `「${hitWords.slice(0, 3).join(', ')}」など、${hitCount}個のキーワードを発見！`;
-    }
-
-    return { score: Math.round(score), detail };
-}
-
-// --- 2. 韻（ライム）チェッカー ---
-function checkRhyme(text: string): ScoreResult {
-    const verses = text.split(/[、。！?\n]/).filter(v => v.trim().length > 2);
-    
-    if (verses.length < 2) {
-        return { score: 0, detail: "韻を比較できる文が2つ以上ありません。" };
-    }
-
-    let totalSimilarity = 0;
-    let pairsCompared = 0;
-    const RHYME_CHECK_LENGTH = 5; 
-
-    for (let i = 0; i < verses.length - 1; i++) {
-        const verse1 = verses[i].trim();
-        const verse2 = verses[i+1].trim();
-
-        const vowels1 = getVowels(verse1.slice(-RHYME_CHECK_LENGTH));
-        const vowels2 = getVowels(verse2.slice(-RHYME_CHECK_LENGTH));
-
-        if (vowels1.length > 0 && vowels2.length > 0) {
-            const distance = levenshteinDistance(vowels1, vowels2);
-            const similarity = calculateSimilarity(distance, vowels1.length, vowels2.length);
-            totalSimilarity += similarity;
-            pairsCompared++;
-        }
-    }
-
-    if (pairsCompared === 0) {
-        return { score: 0, detail: "母音を比較できるペアがありませんでした。" };
-    }
-
-    const averageScore = totalSimilarity / pairsCompared;
-    const score = Math.min(100, averageScore); 
-
-    let detail = `文末の母音の類似度 (平均 ${Math.round(score)}%)。`;
-    if (score > 80) detail += " 素晴らしい韻です！";
-    else if (score > 50) detail += " 良い韻を踏んでいます。";
-    else detail += " もっと韻を踏めそうです。";
-    
-    return { score: Math.round(score), detail };
-}
-
-// --- 3. リズムチェッカー ---
-function countSyllables(text: string): number {
-    const katakanaText = text.replace(/[ぁ-ん]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60));
-    const syllables = katakanaText.match(/[アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ]/g);
-    return syllables ? syllables.length : 0;
-}
-
-function calculateStdDev(arr: number[]): { mean: number, stdDev: number } {
-    if (arr.length === 0) return { mean: 0, stdDev: 0 };
-    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-    const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length;
-    return { mean, stdDev: Math.sqrt(variance) };
-}
-
-function checkRhythm(text: string): ScoreResult {
-    const verses = text.split(/[、。！?\n]/).filter(v => v.trim().length > 0);
-    
-    if (verses.length < 2) {
-        return { score: 0, detail: "リズムを比較できる文が2つ以上ありません。" };
-    }
-
-    const syllableCounts = verses.map(countSyllables).filter(count => count > 0);
-    
-    if (syllableCounts.length < 2) {
-        return { score: 10, detail: "音節をカウントできる文が不足しています。" };
-    }
-
-    const { mean, stdDev } = calculateStdDev(syllableCounts);
-
-    const score = Math.max(0, (1 - (stdDev / mean)) * 100);
-
-    let detail = `音節数のばらつき (平均${mean.toFixed(1)}音, 偏差${stdDev.toFixed(1)})。`;
-    if (score > 80) detail += " 非常に安定したリズムです！";
-    else if (score > 50) detail += " 良いリズム感です。";
-    else detail += " リズムがやや不安定です。";
-
-    return { score: Math.round(score), detail };
-}
-
-// --- 4. 意味（文脈）チェッカー ---
-function checkMeaning(text: string, themeKeywords: string[]): ScoreResult {
-    let contextCount = 0;
-    const CONTEXT_DISTANCE = 15; 
-
-    const hitKeywords: { word: string, index: number }[] = [];
-    themeKeywords.forEach(keyword => {
-        const regex = new RegExp(keyword, 'gi');
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            hitKeywords.push({ word: keyword, index: match.index });
-        }
-    });
-
-    if (hitKeywords.length < 2) {
-        return { score: 10, detail: "キーワードが少ないため文脈を評価できません。" };
-    }
-
-    hitKeywords.sort((a, b) => a.index - b.index);
-
-    for (let i = 0; i < hitKeywords.length - 1; i++) {
-        const wordA = hitKeywords[i];
-        const wordB = hitKeywords[i+1];
-
-        if (wordA.word !== wordB.word && (wordB.index - (wordA.index + wordA.word.length)) <= CONTEXT_DISTANCE) {
-            contextCount++;
-        }
-    }
-
-    const score = Math.min(100, (contextCount / 3) * 100);
-
-    let detail = "";
-    if (contextCount > 0) {
-        detail = `キーワード同士が${contextCount}回、近い文脈で使われています！`;
-    } else {
-        detail = "キーワードが散発的で、文脈があまり見られません。";
-    }
-
-    return { score: Math.round(score), detail };
-}
-
-// --- 総合採点 ---
-function calculateTotalScore(text: string, theme: FishTheme): TotalScore {
-    const themeKeywords = fishKeywords[theme] || [];
-
-    const keywordResult = checkKeywords(text, themeKeywords);
-    const rhymeResult = checkRhyme(text);
-    const rhythmResult = checkRhythm(text);
-    const meaningResult = checkMeaning(text, themeKeywords);
-
-    const totalScore = Math.round(
-        keywordResult.score * 0.35 +
-        rhymeResult.score * 0.30 +
-        rhythmResult.score * 0.15 +
-        meaningResult.score * 0.20
-    );
-
-    let finalMessage = "お疲れ様でした！";
-    if (totalScore > 90) finalMessage = "完璧なフロウ！キングオブヘッド！";
-    else if (totalScore > 75) finalMessage = "素晴らしい！お題を乗りこなしています！";
-    else if (totalScore > 50) finalMessage = "良い感じです！その調子！";
-    else finalMessage = "惜しい！次はもっと上を目指そう！";
-
-    return {
-        totalScore,
-        finalMessage,
-        keyword: keywordResult,
-        rhyme: rhymeResult,
-        rhythm: rhythmResult,
-        meaning: meaningResult,
-    };
-}
-
-
-// ==================================================================
-// 音声認識コンポーネント (RhymeCheckerClient)
-// ==================================================================
 
 interface RhymeCheckerProps {
-    onSubmit: (transcript: string) => void; // 親にテキストを送信するコールバック
-    isLoading: boolean; // 親が処理中かどうか
+    onSubmit: (transcript: string) => void;
+    isLoading: boolean;
 }
 
-/**
- * 音声認識とテキスト入力UIを担当するクライアントコンポーネント
- */
 function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
-    // --- State ---
     const [isListening, setIsListening] = useState(false);
     const [status, setStatus] = useState('待機中');
     const [finalTranscript, setFinalTranscript] = useState('');
     const [interimTranscript, setInterimTranscript] = useState('');
     const [isBrowserSupported, setIsBrowserSupported] = useState(true);
-
-    // --- Ref ---
     const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-    // --- useEffect (コンポーネントのマウント時に実行) ---
     useEffect(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         
@@ -420,9 +80,7 @@ function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
                 recognitionRef.current.onresult = null;
             }
         };
-    }, []); // マウント時に1回だけ実行
-
-    // --- 操作関数 ---
+    }, []);
     const startListening = () => {
         if (recognitionRef.current && !isListening && !isLoading) {
             setFinalTranscript(''); 
@@ -453,7 +111,6 @@ function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
         setStatus('待機中');
     };
 
-    // --- フォーム送信時の処理 (親コンポーネントに通知) ---
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault(); 
         
@@ -465,11 +122,9 @@ function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
         onSubmit(finalTranscript); 
     };
 
-    // --- レンダリング ---
     return (
         <div className="font-sans">
             
-            {/* --- 録音ボタン --- */}
             <div className="flex flex-wrap gap-4 mb-6">
                 <button
                     onClick={startListening}
@@ -510,19 +165,13 @@ function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
                     リセット
                 </button>
             </div>
-
-            {/* --- ステータス表示 --- */}
             <div className="mb-4 text-lg font-semibold text-gray-300">
                 ステータス: {status}
             </div>
-
-            {/* --- リアルタイム結果表示（視覚用） --- */}
             <div className="w-full min-h-[100px] p-4 mb-6 bg-gray-800 border border-gray-600 rounded-md shadow-inner">
                 {finalTranscript}
                 <span className="text-gray-400">{interimTranscript}</span>
             </div>
-
-            {/* --- 送信フォーム --- */}
             <form onSubmit={handleSubmit} className="mt-6">
                 <label
                     htmlFor="transcript-textarea"
@@ -557,7 +206,7 @@ function RhymeCheckerClient({ onSubmit, isLoading }: RhymeCheckerProps) {
 // メインページコンポーネント (RhymeBattlePage)
 // ==================================================================
 
-// 利用可能なお題（魚）のキーを取得
+// 利用可能なお題（魚）のキーをインポートしたデータから取得
 const availableThemes = Object.keys(fishKeywords) as FishTheme[];
 
 /**
@@ -588,11 +237,10 @@ export default function RhymeBattlePage() {
         setScoreResult(null);
 
         try {
-            // checkerLogic の採点関数を呼び出す
             // (非同期処理を模倣するために少し待機)
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // 同じファイル内にある関数を直接呼び出す
+            // インポートした採点関数を呼び出す
             const result = calculateTotalScore(transcript, selectedTheme);
             setScoreResult(result);
 
@@ -726,4 +374,3 @@ const LoadingSpinner = () => (
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-cyan-500"></div>
     </div>
 );
-
