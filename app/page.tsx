@@ -160,7 +160,7 @@ export default function Home() {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const left = Math.random() * 100; // % 表示位置
       const size = 6 + Math.random() * 28; // px
-      const duration = 1 + Math.random() ; // 秒: 浮上にかかる時間
+      const duration = 1 + Math.random(); // 秒: 浮上にかかる時間
       const delay = Math.random() * 1.2; // 秒
       const bottom = 8 + Math.random() * 100; // px: スタート位置（低めに）
       const opacity = 0.4 + Math.random() * 0.6;
@@ -253,73 +253,74 @@ export default function Home() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-between 
-                  bg-gradient-to-b from-sky-200 via-blue-500 to-blue-900 
-                  relative overflow-hidden p-10"
-    >
-      <div
-        className="min-h-screen flex flex-col items-center justify-between 
-             relative overflow-hidden p-10
-             bg-gradient-to-b from-sky-200 via-blue-500 to-blue-900
-             bg-[position:100%_30%] bg-no-repeat bg-[length:100px_100px]"
-        style={{ backgroundImage: "url('/images/pixelFish1.png')" }}
-      >
+    <div className="min-h-screen flex flex-col items-center justify-between relative overflow-hidden p-10">
+      {/* 背景を画面全体に固定するレイヤー（背景はここだけにする） */}
+      <div className="fixed inset-0 -z-20 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-200 via-blue-500 to-blue-900" />
+      </div>
+
+      {/* 泡と背景画像レイヤー（背景画像をビューポート基準で配置） */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
         <div
-          className="min-h-screen flex flex-col items-center justify-between 
-             relative overflow-hidden p-10
-             bg-gradient-to-b from-sky-200 via-blue-500 to-blue-900
-             bg-[position:30%_0%] bg-no-repeat bg-[length:100px_100px]"
+          className="absolute inset-0 bg-no-repeat bg-[length:100px_100px] bg-[position:70%_30%]"
+          style={{ backgroundImage: "url('/images/pixelFish1.png')" }}
+        />
+        <div
+          className="absolute inset-0 bg-no-repeat bg-[length:100px_100px] bg-[position:30%_0%]"
           style={{ backgroundImage: "url('/images/pixelFish2.png')" }}
-        >
-          {/* 泡用のスタック（絶対配置エリア） */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-            {/* 静的な小さなバブル（元の3つ） */}
-            <div className="animate-bounce w-6 h-6 bg-white/40 rounded-full absolute top-10 left-1/4"></div>
-            <div className="animate-bounce w-4 h-4 bg-white/30 rounded-full absolute top-1/3 left-2/3 delay-200"></div>
-            <div className="animate-bounce w-8 h-8 bg-white/20 rounded-full absolute bottom-20 right-1/4 delay-500"></div>
+        />
+        <div
+          className="absolute inset-0 bg-no-repeat bg-[length:100px_100px] bg-[position:20%_80%]"
+          style={{ backgroundImage: "url('/images/pixelFish3.png')" }}
+        />
+        <div
+          className="absolute inset-0 bg-no-repeat bg-[length:1500px_800px] bg-[position:50%_100%]"
+          style={{ backgroundImage: "url('/images/seaweed.png')" }}
+        />
 
-            {/* ランダム生成される泡を描画 */}
-            {bubbles.map((b) => (
-              <div
-                key={b.id}
-                style={{
-                  position: "absolute",
-                  left: `${b.left}%`,
-                  bottom: `${b.bottom}px`,
-                  width: `${b.size}px`,
-                  height: `${b.size}px`,
-                  marginLeft: `-${b.size / 2}px`,
-                  borderRadius: "50%",
-                  background: `rgba(255,255,255,${Math.min(1, b.opacity)})`,
-                  boxShadow: "0 0 8px rgba(255,255,255,0.2)",
-                  transform: "translateY(0)",
-                  animation: `bubbleFloat ${b.duration}s linear ${b.delay}s forwards`,
-                  zIndex: 5,
-                  pointerEvents: "none",
-                }}
-              />
-            ))}
+        {/* ランダム生成される泡を描画（fixed レイヤーなので親の overflow に影響されない） */}
+        {bubbles.map((b) => {
+          const style: React.CSSProperties = {
+            position: "absolute",
+            left: `${b.left}%`,
+            bottom: `${b.bottom}px`,
+            width: `${b.size}px`,
+            height: `${b.size}px`,
+            marginLeft: `-${b.size / 2}px`,
+            borderRadius: "50%",
+            background: `rgba(255,255,255,${Math.min(1, b.opacity)})`,
+            boxShadow: "0 0 8px rgba(255,255,255,0.2)",
+            transform: "translateY(0)",
+            animation: `bubbleFloat ${b.duration}s linear ${b.delay}s forwards`,
+            zIndex: 0,
+            pointerEvents: "none",
+          };
+          return <div key={b.id} style={style} />;
+        })}
 
-            {/* アニメーション定義（インラインで埋め込む） */}
-            <style>{`
-              @keyframes bubbleFloat {
-                0% {
-                  transform: translateY(0) scale(1);
-                  opacity: 1;
-                }
-                60% {
-                  transform: translateY(-120px) scale(1.05);
-                  opacity: 0.6;
-                }
-                100% {
-                  transform: translateY(-520px) scale(1.12);
-                  opacity: 0;
-                }
-              }
-            `}</style>
-          </div>
+        {/* アニメーション定義（vh を使い画面比率に応じて上まで行く） */}
+        <style>{`
+          @keyframes bubbleFloat {
+            0% {
+              transform: translateY(0) scale(1);
+              opacity: 1;
+            }
+            60% {
+              transform: translateY(-30vh) scale(1.05);
+              opacity: 0.6;
+            }
+            100% {
+              transform: translateY(-60vh) scale(1.12);
+              opacity: 0;
+            }
+          }
+        `}</style>
+      </div>
 
+      {/* ===== コンテンツ領域（内部の background 指定は削除） ===== */}
+      <div className="min-h-screen flex flex-col items-center justify-between relative p-10">
+        <div className="min-h-screen flex flex-col items-center justify-between relative p-10">
+          {/* ここからは UI（泡以外） */}
           <div className="flex justify-center gap-6 mt-10 z-10">
             {currentKeywords.map((keyword, index) => (
               <div
