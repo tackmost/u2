@@ -19,8 +19,13 @@ const Page = () => {
       </div>
 
       {/* 下のレコード矩形 */}
-      <div className="flex justify-center mb-20">
-        <button className="w-100 max-w-md md:max-w-xl lg:max-w-2xl h-20 bg-white border-4 border-black rounded-xl font-bold text-xl hover:bg-blue-200 transition-colors duration-200">
+      {/* 下のレコード矩形 */}
+      <div className="flex justify-center mb-20 px-4">
+        <button
+          className="w-80 md:w-96 lg:w-[500px] h-20 bg-white border-4 border-black rounded-xl font-bold text-xl
+               hover:bg-blue-200 active:scale-95 transition-all duration-200 shadow-md focus:outline-none focus:ring-4 focus:ring-blue-300"
+          aria-label="Record button"
+        >
           record
         </button>
       </div>
