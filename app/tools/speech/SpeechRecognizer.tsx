@@ -1,8 +1,11 @@
-"use client";
+// -----------------------------------------------------------
+// app/tools/rhyme-checker/RhymeCheckerClient.tsx
+// -----------------------------------------------------------
+"use client"; // クライアントコンポーネントとしてマーク
 
 import { useState, useEffect, useRef } from 'react';
 
-export default function SpeechRecognizer() {
+export default function RhymeCheckerClient() {
     // --- State ---
     const [isListening, setIsListening] = useState(false);
     const [status, setStatus] = useState('待機中');
@@ -97,57 +100,110 @@ export default function SpeechRecognizer() {
         }
     };
 
+    const handleReset = () => {
+        // 録音中であれば停止する
+        if (isListening) {
+            stopListening();
+        }
+        // 全てのテキストをリセット
+        setFinalTranscript('');
+        setInterimTranscript('');
+        // ステータスをリセット
+        setStatus('待機中');
+        console.log('テキストがリセットされました。');
+    };
+
+    // ★ フォーム送信時の処理
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        // フォーム送信によるページの再読み込みを防止
+        event.preventDefault();
+
+        console.log('フォームが送信されました:', finalTranscript);
+        alert(`以下の内容で送信します:\n\n${finalTranscript}`); //ここでAPIなどを叩く
+
+        // ここで fetch() などを使ってサーバーに finalTranscript を送信する
+    };
+
+    // --- レンダリング ---
     return (
-        <div>
-            <style jsx>{`
-        .container {
-          padding: 20px;
-          font-family: sans-serif;
-        }
-        .buttons {
-          margin-bottom: 20px;
-        }
-        .buttons button {
-          margin-right: 10px;
-          padding: 8px 12px;
-          font-size: 16px;
-        }
-        .status {
-          font-weight: bold;
-          margin-bottom: 10px;
-        }
-        .result-box {
-          border: 1px solid #ccc;
-          padding: 10px;
-          min-height: 150px;
-          background-color: #f9f9f9;
-        }
-        .interim {
-          color: grey;
-        }
-      `}</style>
+        <div className="max-w-3xl mx-auto p-6 font-sans">
+            <h1 className="text-3xl font-bold mb-6 text-gray-900">
+                リアルタイム文字起こし
+            </h1>
 
-            <div className="container">
-                <h1>リアルタイム文字起こし (Next.js)</h1>
+            {/* --- 録音ボタン --- */}
+            <div className="flex space-x-4 mb-6">
+                <button
+                    onClick={startListening}
+                    disabled={isListening}
+                    className={`
+            px-5 py-2.5 font-medium rounded-lg shadow-sm text-white
+            ${isListening
+                            ? 'bg-blue-300 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                        }
+          `}
+                >
+                    録音開始
+                </button>
+                <button
+                    onClick={stopListening}
+                    disabled={!isListening}
+                    className={`
+            px-5 py-2.5 font-medium rounded-lg shadow-sm text-white
+            ${!isListening
+                            ? 'bg-orange-500 cursor-not-allowed'
+                            : 'bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
+                        }
+          `}
+                >
+                    録音停止
+                </button>
 
-                <div className="buttons">
-                    <button onClick={startListening} disabled={isListening}>
-                        録音開始
-                    </button>
-                    <button onClick={stopListening} disabled={!isListening}>
-                        録音停止
-                    </button>
-                </div>
-
-                <div className="status">ステータス: {status}</div>
-
-                <div className="result-box">
-                    {/* 確定したテキスト */}
-                    {finalTranscript}
-                    {/* 認識中のテキスト */}
-                    <span className="interim">{interimTranscript}</span>
-                </div>
+                <button
+                    onClick={handleReset}
+                    className={`
+            px-5 py-2.5 font-medium rounded-lg shadow-sm text-white
+            bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400
+          `}
+                >
+                    リセット
+                </button>
             </div>
+
+            {/* --- ステータス表示 --- */}
+            <div className="mb-4 text-lg font-semibold text-gray-700">
+                ステータス: {status}
+            </div>
+
+            {/* --- リアルタイム結果表示（視覚用） --- */}
+            <div className="w-full min-h-[150px] p-4 mb-6 bg-gray-50 border border-gray-300 rounded-md shadow-inner">
+                {finalTranscript}
+                <span className="text-gray-500">{interimTranscript}</span>
+            </div>
+
+            {/* --- 送信フォーム --- */}
+            <form onSubmit={handleSubmit} className="mt-6">
+                <label
+                    htmlFor="transcript-textarea"
+                    className="block mb-2 text-sm font-medium text-gray-700"
+                >
+                    認識結果 (編集・送信可能):
+                </label>
+                <textarea
+                    id="transcript-textarea"
+                    value={finalTranscript}
+                    onChange={(e) => setFinalTranscript(e.target.value)}
+                    rows={6}
+                    className="w-full p-3 text-base border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                    type="submit"
+                    className="mt-4 px-6 py-2.5 text-base font-medium text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                    この内容で送信
+                </button>
+            </form>
         </div>
     );
 }
