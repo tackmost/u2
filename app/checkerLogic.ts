@@ -1,6 +1,3 @@
-/**
- * 魚のキーワードデータを定義するインターフェース
- */
 export interface FishKeywordData {
     [fishName: string]: string[];
 }
@@ -32,7 +29,7 @@ export const fishKeywords: FishKeywordData = {
     ]
 };
 
-// --- 既存のヘルパー関数 ---
+// --- ヘルパー関数 ---
 
 /**
  * カタカナの読み仮名から母音の文字列を抽出する
@@ -64,11 +61,10 @@ export function getVowels(reading: string): string {
         'ャ': 'A', 'ュ': 'U', 'ョ': 'O',
     };
 
-    // 処理前に全角カタカナに統一し、不要な文字を除去
     const cleanReading = reading
-        .replace(/[ぁ-ん]/g, (s) => String.fromCharCode(s.charCodeAt(0) + 0x60)) // ひらがな -> カタカナ
-        .replace(/[A-Za-z0-9]/g, '') // 英数字を除去
-        .replace(/[、。！？「」]/g, ''); // 句読点を除去
+        .replace(/[ぁ-ん]/g, (s) => String.fromCharCode(s.charCodeAt(0) + 0x60))
+        .replace(/[A-Za-z0-9]/g, '')
+        .replace(/[、。！？「」]/g, '');
 
     for (const char of cleanReading) {
         if (vowelMap[char]) {
@@ -84,7 +80,6 @@ export function getVowels(reading: string): string {
                 vowels += lastVowel;
             }
         }
-        // ッ（促音）は無視
     }
     return vowels;
 }
@@ -102,9 +97,9 @@ export function levenshteinDistance(a: string, b: string): number {
         for (let i = 1; i <= a.length; i++) {
             const cost = a[i - 1] === b[j - 1] ? 0 : 1;
             matrix[j][i] = Math.min(
-                matrix[j][i - 1] + 1,      // 削除
-                matrix[j - 1][i] + 1,      // 挿入
-                matrix[j - 1][i - 1] + cost // 置換
+                matrix[j][i - 1] + 1,
+                matrix[j - 1][i] + 1,
+                matrix[j - 1][i - 1] + cost
             );
         }
     }
@@ -122,7 +117,7 @@ export function calculateSimilarity(distance: number, len1: number, len2: number
 }
 
 
-// --- 新しい採点ロジック ---
+// --- 採点ロジック ---
 
 /**
  * 採点結果の型
@@ -185,13 +180,11 @@ function checkRhyme(text: string): ScoreResult {
 
     let totalSimilarity = 0;
     let pairsCompared = 0;
-    const RHYME_CHECK_LENGTH = 5; // 末尾5文字の母音で比較
+    const RHYME_CHECK_LENGTH = 5;
 
     for (let i = 0; i < verses.length - 1; i++) {
         const verse1 = verses[i].trim();
         const verse2 = verses[i+1].trim();
-
-        // 各バースの末尾の母音を取得
         const vowels1 = getVowels(verse1.slice(-RHYME_CHECK_LENGTH));
         const vowels2 = getVowels(verse2.slice(-RHYME_CHECK_LENGTH));
 
