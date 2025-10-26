@@ -1,16 +1,14 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { fishKeywords } from "@/lib/keywords";
+import { useState, useEffect, useRef } from 'react';
+import { calculateTotalScore, fishKeywords } from '@/app/checkerLogic';
+import type { TotalScore, FishTheme } from '@/app/checkerLogic';
 
-function shuffleArray(array: string[]): string[] {
-  const newArray = [...array]; // 元の配列を壊さないようにコピー
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
+
+interface RhymeCheckerProps {
+    onSubmit: (transcript: string) => void;
+    isLoading: boolean;
 }
 type Bubble = {
   id: string;
@@ -124,17 +122,134 @@ export default function Home() {
       let interim = "";
       let final = "";
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
-      }
+    return (
+        <div className="font-sans">
+            
+            <div className="flex flex-wrap gap-4 mb-6">
+                <button
+                    onClick={startListening}
+                    disabled={isListening || isLoading || !isBrowserSupported}
+                    className={`
+                        px-5 py-2.5 font-medium rounded-lg shadow-sm text-white flex items-center justify-center
+                        ${(isListening || isLoading || !isBrowserSupported)
+                            ? 'bg-cyan-800 text-gray-400 cursor-not-allowed'
+                            : 'bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500'
+                        }
+                    `}
+                >
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7v1h6v-1h-2v-2.07z" clipRule="evenodd"></path></svg>
+                    録音開始
+                </button>
+                <button
+                    onClick={stopListening}
+                    disabled={!isListening || isLoading}
+                    className={`
+                        px-5 py-2.5 font-medium rounded-lg shadow-sm text-white
+                        ${(!isListening || isLoading)
+                            ? 'bg-red-800 text-gray-400 cursor-not-allowed'
+                            : 'bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
+                        }
+                    `}
+                >
+                    録音停止
+                </button>
+                <button
+                    onClick={handleReset}
+                    disabled={isLoading}
+                    className={`
+                        px-5 py-2.5 font-medium rounded-lg shadow-sm text-white
+                        bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
+                        ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                >
+                    リセット
+                </button>
+            </div>
+            <div className="mb-4 text-lg font-semibold text-gray-300">
+                ステータス: {status}
+            </div>
+            <div className="w-full min-h-[100px] p-4 mb-6 bg-gray-800 border border-gray-600 rounded-md shadow-inner">
+                {finalTranscript}
+                <span className="text-gray-400">{interimTranscript}</span>
+            </div>
+            <form onSubmit={handleSubmit} className="mt-6">
+                <label
+                    htmlFor="transcript-textarea"
+                    className="block mb-2 text-sm font-medium text-gray-400"
+                >
+                    認識結果 (編集・採点可能):
+                </label>
+                <textarea
+                    id="transcript-textarea"
+                    value={finalTranscript}
+                    onChange={(e) => setFinalTranscript(e.target.value)}
+                    rows={6}
+                    disabled={isLoading}
+                    className="w-full p-3 text-base bg-gray-800 border border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white disabled:opacity-70"
+                    placeholder="ここに音声認識結果が表示されます。手動での入力・編集も可能です。"
+                />
+                <button
+                    type="submit"
+                    disabled={isLoading || !finalTranscript.trim()}
+                    className="mt-4 w-full px-6 py-3 text-base font-medium text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500
+                    disabled:bg-green-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                    {isLoading ? '採点中...' : 'この内容で採点する'}
+                </button>
+            </form>
+        </div>
+    );
+}
 
-      setInterimTranscript(interim);
-      // 確定した結果を既存のfinalTranscriptに追加
-      setFinalTranscript((prev) => prev + final);
+
+// ==================================================================
+// メインページコンポーネント (RhymeBattlePage)
+// ==================================================================
+
+// 利用可能なお題（魚）のキーをインポートしたデータから取得
+const availableThemes = Object.keys(fishKeywords) as FishTheme[];
+
+/**
+ * ラップ採点アプリケーションのメインページ
+ */
+export default function RhymeBattlePage() {
+    // --- State ---
+    const [selectedTheme, setSelectedTheme] = useState<FishTheme>(availableThemes[0]);
+    const [scoreResult, setScoreResult] = useState<TotalScore | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // --- Handlers ---
+
+    /**
+     * RhymeCheckerClient から音声認識結果（テキスト）が送信されたときに呼び出される
+     * @param transcript 認識されたテキスト
+     */
+    const handleTranscriptSubmit = async (transcript: string) => {
+        if (!transcript.trim()) {
+            setError("テキストが入力されていません。");
+            setScoreResult(null);
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setScoreResult(null);
+
+        try {
+            // (非同期処理を模倣するために少し待機)
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // インポートした採点関数を呼び出す
+            const result = calculateTotalScore(transcript, selectedTheme);
+            setScoreResult(result);
+
+        } catch (err) {
+            console.error("採点エラー:", err);
+            setError("採点中にエラーが発生しました。");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // --- クリーンアップ関数 (アンマウント時) ---
