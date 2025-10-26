@@ -1,1 +1,1 @@
-npm install kuromoji
+npm install kuromoji zod

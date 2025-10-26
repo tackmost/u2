@@ -1,19 +1,19 @@
-import { Metadata } from 'next';
-import VowelCheckerClient from './VowelCheckerClient';
+import VowelCheckerClient from '../vowel-checker/VowelCheckerClient';
+import Script from 'next/script';
 
-// ページのメタデータ
-export const metadata: Metadata = {
-  title: '機械式 母音チェッカー (Kuromoji)',
-  description: 'kuromoji.js を使用して、2つのテキストの母音の一致度を機械的に判定します。',
-};
-
-// ページのコンポーネント
-export default function VowelCheckerPage() {
-  
+export default function Home() {
   return (
-    <main className="bg-gray-100 min-h-screen flex items-center justify-center p-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* 実際の機能はすべてクライアントコンポーネントが担当 */}
-      <VowelCheckerClient />
-    </main>
+    <>
+      <Script
+        src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"
+        strategy="beforeInteractive"
+      />
+
+      <main className="flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 p-4 sm:p-10">
+        <div className="w-full max-w-2xl">
+          <VowelCheckerClient />
+        </div>
+      </main>
+    </>
   );
 }
