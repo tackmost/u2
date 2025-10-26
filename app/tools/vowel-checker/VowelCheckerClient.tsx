@@ -1,14 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-// @ts-ignore
-// import * as kuromoji from 'kuromoji';
 import { z } from 'zod';
 
 // --- 1. 母音抽出ロジック ---
-/**
- * カタカナの読み仮名から母音の文字列を抽出する
- */
 export function getVowels(reading: string): string {
   let vowels = '';
   let lastVowel = '';
@@ -57,9 +52,7 @@ export function getVowels(reading: string): string {
 }
 
 // --- 2. 機械的採点 (Levenshtein) ---
-/**
- * 2つの文字列間のレーベンシュタイン距離を計算する
- */
+
 export function levenshteinDistance(a: string, b: string): number {
   const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
   for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
@@ -90,10 +83,10 @@ const LlmAnalysisSchema = z.object({
     .describe("文章全体としての意味がどれだけ通っているか (0:意味不明, 100:完璧に明瞭)"),
   rhyme_score: z.number().min(0).max(100)
     .describe("「、」で区切られた各フレーズが、どれだけリズミカルに韻を踏んでいるか (0:全く踏んでいない, 100:完璧にリズミカル)"),
-  keyword_score: z.number().min(0).max(100) // ★復活
+  keyword_score: z.number().min(0).max(100)
     .describe("指定されたキーワードが文章にどれだけ自然に含まれているか (0:全くない, 100:完璧)"),
   analysis: z.string()
-    .describe("上記3つのスコアの採点理由を簡潔に説明"), // 「3つ」に変更
+    .describe("上記3つのスコアの採点理由を簡潔に説明"),
 });
 export type LlmAnalysisResult = z.infer<typeof LlmAnalysisSchema>;
 
@@ -101,27 +94,25 @@ const apiKey = (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_GEMINI_
 const geminiApiKey = apiKey === "" ? "" : `key=${apiKey}`;
 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?${geminiApiKey}`;
 
-// AIの採点基準 (Schema) を変更 (3項目)
+// AIの採点基準
 const responseSchema = {
   type: "OBJECT",
   properties: {
     coherence_score: { type: "NUMBER", description: "文章全体としての意味がどれだけ通っているか (0:意味不明, 100:完璧に明瞭)" },
     rhyme_score: { type: "NUMBER", description: "「、」で区切られた各フレーズが、どれだけリズミカルに韻を踏んでいるか (0:全く踏んでいない, 100:完璧にリズミカル)" },
-    keyword_score: { type: "NUMBER", description: "指定されたキーワードが文章にどれだけ自然に含まれているか (0:全くない, 100:完璧)" }, // ★復活
-    analysis: { type: "STRING", description: "上記3つのスコアの採点理由を簡潔に説明" }, // 「3つ」に変更
+    keyword_score: { type: "NUMBER", description: "指定されたキーワードが文章にどれだけ自然に含まれているか (0:全くない, 100:完璧)" },
+    analysis: { type: "STRING", description: "上記3つのスコアの採点理由を簡潔に説明" },
   },
-  required: ["coherence_score", "rhyme_score", "keyword_score", "analysis"] // ★復活
+  required: ["coherence_score", "rhyme_score", "keyword_score", "analysis"]
 };
 
-// AIへの指示 (SystemPrompt) を変更 (3項目)
+// AIへの指示
 const systemPrompt = `あなたは日本語の文章評価、特に「韻」（ライム）の専門家です。入力された「メインの文章」を、「、」（読点）で区切られた各フレーズ、および「指定されたキーワード」に基づいて、以下の3つの観点で厳密に採点してください。
 1.  **意味の明瞭度 (coherence_score):** 「メインの文章」全体が、文法的に正しく、意味がどれだけ明確に通るか。0点（意味不明）から100点（完璧に明瞭）で採点します。
 2.  **韻のリズム評価 (rhyme_score):** 「、」で区切られた各フレーズが、音の響きや母音の一致において、どれだけリズミカルに「韻を踏んでいる」か。0点（全く韻を踏んでいない）から100点（完璧にリズミカルな韻）で採点します。
 3.  **キーワード含有度 (keyword_score):** 「指定されたキーワード」（カンマ区切り）が、「メインの文章」にどれだけ自然かつ効果的に含まれているか。無理やり詰め込んだ場合は減点します。0点（全く含まない）から100点（完璧に含む）で採点します。`;
 
-// getLlmAnalysis に keywords を復活
 export async function getLlmAnalysis(mainText: string, keywords: string): Promise<LlmAnalysisResult> {
-  // userPrompt に keywords を復活
   const userPrompt = `
 メインの文章: "${mainText}"
 指定されたキーワード: "${keywords}"
@@ -136,11 +127,10 @@ export async function getLlmAnalysis(mainText: string, keywords: string): Promis
     }
   };
 
-  // API呼び出しにリトライとバックオフを実装
   let response: Response | undefined;
   let attempts = 0;
   const maxAttempts = 5;
-  let delay = 1000; // 1 second
+  let delay = 1000;
 
   while (attempts < maxAttempts) {
     try {
@@ -152,19 +142,16 @@ export async function getLlmAnalysis(mainText: string, keywords: string): Promis
       });
 
       if (response.ok) {
-        break; // 成功
+        break;
       }
 
       if (response.status === 429 || response.status >= 500) {
-        // リトライ対象のエラー
         if (attempts === maxAttempts) {
           throw new Error(`APIエラー (ステータス: ${response.status})。リトライ上限に達しました。`);
         }
         await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempts - 1)));
       } else {
-        // リトライ対象外のエラー (400 Bad Request など)
         const errorBody = await response.json().catch(() => ({ error: { message: "レスポンスの解析に失敗しました。" } }));
-        // @ts-ignore
         const errorMsg = errorBody?.error?.message || `APIエラーが発生しました (ステータス: ${response.status})`;
         throw new Error(errorMsg);
       }
@@ -184,12 +171,10 @@ export async function getLlmAnalysis(mainText: string, keywords: string): Promis
 
   try {
     const result = await response.json();
-    // @ts-ignore
     if (!result.candidates || !result.candidates[0].content.parts[0].text) {
         console.error("AIからの予期しないレスポンス:", result);
         throw new Error("AIからの応答が空か、または予期しない形式です。");
     }
-    // @ts-ignore
     const jsonText = result.candidates[0].content.parts[0].text;
     const parsedJson = JSON.parse(jsonText);
     const validationResult = LlmAnalysisSchema.safeParse(parsedJson);
@@ -213,7 +198,6 @@ interface VowelResult {
   vowels: string;
 }
 
-// 重み (WEIGHTS) を変更 (4項目)
 const WEIGHTS = {
   VOWEL_SIMILARITY: 0.3, // 機械的 母音類似度 (30%)
   RHYME: 0.3,            // AI: 韻のリズム評価 (30%)
@@ -229,9 +213,9 @@ export default function VowelCheckerClient() {
   const [vowelScore, setVowelScore] = useState<number | null>(null);
 
   // LLM (AI採点) 用
-  const [keywords, setKeywords] = useState<string>(''); // ★復活
+  const [keywords, setKeywords] = useState<string>('');
   const [llmResult, setLlmResult] = useState<LlmAnalysisResult | null>(null); // AIの採点結果
-  const [keywordResult, setKeywordResult] = useState<VowelResult | null>(null); // ★復活
+  const [keywordResult, setKeywordResult] = useState<VowelResult | null>(null);
 
   // 総合点
   const [totalScore, setTotalScore] = useState<number | null>(null);
@@ -242,14 +226,9 @@ export default function VowelCheckerClient() {
   const [isTokenizerLoading, setIsTokenizerLoading] = useState<boolean>(true);
   const tokenizer = useRef<KuromojiTokenizer | null>(null);
 
-  // ------------------------------------------------------------------
-  // kuromoji.js の初期化
-  // ------------------------------------------------------------------
   useEffect(() => {
-    // 辞書ファイルへのパス (public フォルダ内)
     const dicPath = '/kuromoji-dict'; 
-    
-    // window.kuromoji が <Script> タグによって読み込まれるのを待つ
+
     // @ts-ignore
     if (typeof window.kuromoji !== 'undefined') {
       // @ts-ignore
@@ -263,31 +242,23 @@ export default function VowelCheckerClient() {
         setIsTokenizerLoading(false);
       });
     } else {
-      // <Script> タグの読み込みがまだ/失敗した場合
       console.error('kuromoji.js が window に見つかりません。');
       setError('kuromoji.js が読み込まれていません。page.tsx または layout.tsx の <Script> タグを確認してください。');
       setIsTokenizerLoading(false);
     }
   }, []);
-
-  // ------------------------------------------------------------------
-  // 比較実行ハンドラ (ハイブリッド版)
-  // ------------------------------------------------------------------
-  const handleSubmit = async () => { // async に変更
+  const handleSubmit = async () => { 
     if (!tokenizer.current) {
       setError('形態素解析器がまだ準備中です。');
       return;
     }
-    
-    // フレーズ分割
     const phrases = text1.split('、').filter(p => p.trim() !== '');
     
-    // バリデーション
     if (!text1) {
       setError('テキストを入力してください。');
       return;
     }
-    if (!keywords) { // ★キーワードのバリデーションを追加
+    if (!keywords) {
       setError('キーワードを入力してください。');
       return;
     }
@@ -298,8 +269,8 @@ export default function VowelCheckerClient() {
 
     setIsLoading(true);
     setError(null);
-    setPhrasesResults([]); // フレーズ結果をリセット
-    setKeywordResult(null); // ★キーワード結果をリセット
+    setPhrasesResults([]);
+    setKeywordResult(null);
     setVowelScore(null);
     setLlmResult(null);
     setTotalScore(null);
@@ -319,9 +290,9 @@ export default function VowelCheckerClient() {
         vowelsList.push(vowels);
       }
       
-      setPhrasesResults(newPhrasesResults); // フレーズごとの解析結果をセット
+      setPhrasesResults(newPhrasesResults);
 
-      // ★ キーワードの解析 (復活)
+      // キーワードの解析
       const tokensKeywords: KuromojiToken[] = tokenizer.current.tokenize(keywords);
       const readingKeywords = tokensKeywords.map((t: KuromojiToken) => t.reading || '').join('');
       const vowelsKeywords = getVowels(readingKeywords);
@@ -347,7 +318,7 @@ export default function VowelCheckerClient() {
 
       // --- 2. AI採点 (LLM) ---
       // テキスト1 (原文) と keywords をAIに渡す
-      const llmAnalysis = await getLlmAnalysis(text1, keywords); // ★ keywords を渡す
+      const llmAnalysis = await getLlmAnalysis(text1, keywords);
       setLlmResult(llmAnalysis);
 
       // --- 3. 総合点の算出 (4項目) ---
@@ -355,7 +326,7 @@ export default function VowelCheckerClient() {
         (avgScore * WEIGHTS.VOWEL_SIMILARITY) +
         (llmAnalysis.rhyme_score * WEIGHTS.RHYME) +
         (llmAnalysis.coherence_score * WEIGHTS.COHERENCE) +
-        (llmAnalysis.keyword_score * WEIGHTS.KEYWORD); // ★ keyword_score を追加
+        (llmAnalysis.keyword_score * WEIGHTS.KEYWORD);
       
       setTotalScore(Math.round(finalScore));
 
@@ -367,9 +338,6 @@ export default function VowelCheckerClient() {
     }
   };
   
-  // ------------------------------------------------------------------
-  // レンダリング (JSX)
-  // ------------------------------------------------------------------
   return (
     <div className="bg-white w-full max-w-2xl p-6 sm:p-8 rounded-2xl shadow-lg">
       
@@ -392,7 +360,7 @@ export default function VowelCheckerClient() {
         </div>
       )}
 
-      {/* 入力フォーム (2つに) */}
+      {/* 入力フォーム */}
       <div className="space-y-4">
         <textarea 
           rows={3} 
@@ -402,7 +370,7 @@ export default function VowelCheckerClient() {
           onChange={(e) => setText1(e.target.value)}
           disabled={isTokenizerLoading || isLoading}
         />
-        {/* ★ キーワード入力欄を復活 */}
+        {/* キーワード入力欄 */}
         <input
           type="text"
           className="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-gray-400" 
@@ -415,7 +383,7 @@ export default function VowelCheckerClient() {
         <button 
           className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold text-lg hover:bg-blue-700 transition duration-300 disabled:bg-gray-400"
           onClick={handleSubmit}
-          disabled={isTokenizerLoading || isLoading || !text1 || !keywords} // ★ !keywords を追加
+          disabled={isTokenizerLoading || isLoading || !text1 || !keywords} // 
         >
           {isLoading ? '解析中 (AIが応答中)...' : '韻を採点する'}
         </button>
@@ -435,7 +403,7 @@ export default function VowelCheckerClient() {
             </div>
           </div>
           
-          {/* 採点の内訳 (4項目に変更) */}
+          {/* 採点の内訳 (4項目) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-center">
             <ScoreCard 
               title="機械的 母音類似度" 
@@ -454,9 +422,7 @@ export default function VowelCheckerClient() {
               score={llmResult.coherence_score} 
               weight={WEIGHTS.COHERENCE} 
               color="green"
-            />
-            {/* ★ キーワードスコアカードを追加 */}
-            <ScoreCard 
+            />            <ScoreCard 
               title="AI: キーワード" 
               score={llmResult.keyword_score}
               weight={WEIGHTS.KEYWORD}
