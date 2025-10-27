@@ -131,6 +131,8 @@ export interface ScoreResult {
  * 総合採点結果の型
  */
 export interface TotalScore {
+    keywordScore: number;
+    syntaxScore: number;
     totalScore: number;
     finalMessage: string;
     keyword: ScoreResult;
@@ -328,6 +330,8 @@ export function calculateTotalScore(text: string, theme: FishTheme): TotalScore 
     else finalMessage = "惜しい！次はもっと上を目指そう！";
 
     return {
+        keywordScore: keywordResult.score,
+        syntaxScore: 0,
         totalScore,
         finalMessage,
         keyword: keywordResult,
