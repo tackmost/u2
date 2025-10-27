@@ -22,10 +22,10 @@ export default function RhymeCheckerClient({ onSubmit, isLoading }: Props) {
     // --- Ref ---
     const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-    // --- useEffect (コンポーネントのマウント時に実行) ---
+    // --- useEffect ---
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
+
         if (!SpeechRecognition) {
             setStatus('エラー: お使いのブラウザは音声認識に対応していません。');
             setIsBrowserSupported(false);
@@ -51,7 +51,7 @@ export default function RhymeCheckerClient({ onSubmit, isLoading }: Props) {
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error);
             if (event.error === 'no-speech') {
-                 setStatus('エラー: 音声が検出されませんでした');
+                setStatus('エラー: 音声が検出されませんでした');
             } else if (event.error === 'not-allowed') {
                 setStatus('エラー: マイクへのアクセスが許可されていません');
             } else {
@@ -90,7 +90,7 @@ export default function RhymeCheckerClient({ onSubmit, isLoading }: Props) {
     // --- 操作関数 ---
     const startListening = () => {
         if (recognitionRef.current && !isListening && !isLoading) {
-            setFinalTranscript(''); 
+            setFinalTranscript('');
             setInterimTranscript('');
             try {
                 recognitionRef.current.start();
@@ -121,20 +121,20 @@ export default function RhymeCheckerClient({ onSubmit, isLoading }: Props) {
     // --- ★ フォーム送信時の処理 (親コンポーネントに通知) ---
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault(); // ページの再読み込みを防止
-        
+
         if (isListening) {
             stopListening(); // 送信時に録音中なら停止
         }
-        
+
         console.log('フォームが送信されました:', finalTranscript);
         // 親コンポーネントの onSubmit 関数を実行
-        onSubmit(finalTranscript); 
+        onSubmit(finalTranscript);
     };
 
     // --- レンダリング ---
     return (
         <div className="font-sans">
-            
+
             {/* --- 録音ボタン --- */}
             <div className="flex flex-wrap gap-4 mb-6">
                 <button
